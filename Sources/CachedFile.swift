@@ -41,59 +41,23 @@ import Glibc
 #endif
 
 public struct CachedFile {
-    
+    var source: DispatchSourceProtocol?
+    internal var file: File
+    public var lifeTimePolicy: CacheLifeTimePolicy
+}
+
+public extension CachedFile {
     internal var path: String {
         return self.file.path
     }
-
+    
     internal var updatedDate: time_t {
         return self.file.updatedDate
     }
+    
+}
 
-    internal var file: File
-    
-    public enum Error : Swift.Error {
-        case open(String)
-    }
-    
-    internal class File {
-        
-        internal var path: String
-        internal var policy: FileCachePolicy
-        
-        internal var lastfd: Int32
-        internal var laststat: FileStatus
-        
-        internal var updatedDate: time_t
-        
-        internal var mappedData: Data?
-        internal var swap: Data?
-        
-        public init(path: String, policy: FileCachePolicy, fd: Int32, stat: FileStatus, updated: time_t) {
-            self.path = path
-            self.policy = policy
-            self.lastfd = fd
-            self.laststat = stat
-            self.updatedDate = updated
-        }
-        
-        internal func update() throws {
-            if let stat = try? FileStatus(fd: self.lastfd) {
-                if stat.modificationDate == self.laststat.modificationDate {
-                    return
-                }
-            } else {
-                let newfd = open(path, O_RDWR)
-                if newfd == -1 {
-                    throw CachedFile.Error.open(String.lastErrnoString)
-                }
-                self.lastfd = newfd
-                self.laststat = try FileStatus(fd: lastfd)
-            }
-            self.updatedDate = time(nil)
-        }
-        
-    }
+public extension CachedFile {
     
     public func read() -> Data? {
         switch self.file.policy {
@@ -109,55 +73,76 @@ public struct CachedFile {
         }
     }
     
-    public init(path: String, policy: FileCachePolicy, lifetime: timespec) throws {
+    public init(path: String, policy: FileCachePolicy, lifetime: timespec, lifeTimePolicy: CacheLifeTimePolicy) throws {
         let fd = open(path, O_RDWR)
         let laststat = try FileStatus(fd: fd)
         let updatedDate = time(nil)
+        self.lifeTimePolicy = lifeTimePolicy
+
+        self.file = File(path: path,
+                         policy: policy,
+                         fd: fd,
+                         stat: laststat,
+                         updated: updatedDate)
         
-        self.file = File(path: path, policy: policy, fd: fd, stat: laststat, updated: updatedDate)
-        weak var file = self.file
+        var file: File? = self.file
         var source: DispatchSourceProtocol?
         
         switch policy {
-        case .noReserve:
-            break
             
         case let .interval(time):
             
             source = DispatchSource.makeTimerSource()
-            (source as! DispatchSourceTimer).scheduleRepeating(wallDeadline: DispatchWallTime(timespec: lifetime), interval: DispatchTimeInterval.seconds(time))
-            source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
+            (source as! DispatchSourceTimer).scheduleRepeating(wallDeadline: DispatchWallTime.now(), interval: DispatchTimeInterval.seconds(time))
+            
+            source!.setEventHandler {
+                _ = source
+                
                 guard let file = file else {
-                    // TODO: handle error
+                    
                     return
                 }
+                
                 do {
                     try file.update()
                 } catch {}
-            })
+            }
+            
+            source!.resume()
             
         case .up2Date:
             
-            source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .all)
-            source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
-                do {
-                    try file?.update()
-                } catch {}
-            })
+            func register(fd: Int32) {
+                source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .link)
+                source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
+                    _ = source
+                    
+                    guard let file = file else {
+                        return
+                    }
+                    
+                    do {
+                        try file.update()
+                        register(fd: file.lastfd)
+                    } catch {}
+                })
+                source!.resume()
+            }
+            
+            register(fd: fd)
             
         default:
             break
         }
         
-        if let source = source {
-            source.resume()
-        }
-        
         if case .noReserve = policy {} else {
-            let ptr = mmap(nil, laststat.size, PROT_READ, 0, self.file.lastfd, 0)
-            self.file.mappedData = Data(bytesNoCopy: UnsafeMutableRawPointer(ptr)!, count: laststat.size, deallocator: .unmap)
+            let ptr = mmap(nil, laststat.size, PROT_READ | PROT_WRITE | PROT_EXEC , MAP_FILE | MAP_PRIVATE, self.file.lastfd, 0)
+            if ptr?.numerialValue == -1 {
+                perror("mmap")
+            } else {
+                self.file.mappedData = Data(bytesNoCopy: UnsafeMutableRawPointer(ptr)!, count: laststat.size, deallocator: .unmap)
+            }
         }
-        
     }
 }
 

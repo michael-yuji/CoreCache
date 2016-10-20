@@ -47,15 +47,6 @@ extension ConvenientPointer {
     }
 }
 
-extension String {
-    static var lastErrnoString: String {
-        guard let cErrStr = strerror(errno) else {
-            return "Cannot get error string from errno"
-        }
-        return String(cString: cErrStr) 
-    }
-}
-
 public final class CacheContainer {
     
     public static var `default`: CacheContainer = CacheContainer()
