@@ -31,5 +31,7 @@ CacheContainer.shared.cache(identifier: my_ident, dynamic: source, policy: .inte
 let data = CacheContainer.shared[my_ident]
 ```
 
-BUG: lifetime feature is not finished yet
-The project in still in very early development stage.
+BUG: lifetime feature is not finished yet.
+
+
+The project is still in very early development stage.
