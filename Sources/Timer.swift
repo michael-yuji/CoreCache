@@ -16,88 +16,24 @@
 import Dispatch
 import struct Foundation.UUID
 
-public struct CCTimeInterval: Comparable {
-    internal var nanoseconds: Int
-    
-    public init(sec: Int, milisec: Int, microsec: Int, nsec: Int) {
-        self.nanoseconds = sec * 1_000_000_000 + milisec * 1000_000 + microsec * 1_000 + nsec
+public extension timespec {
+    static var distantFuture: timespec {
+        return timespec(tv_sec: Int.max, tv_nsec: Int.max)
     }
-    
-    var dispatchTimeInterval: DispatchTimeInterval {
-        return DispatchTimeInterval.nanoseconds(nanoseconds)
-    }
-    
-    var unix_timespec: timespec {
-        return timespec(tv_sec: 0, tv_nsec: nanoseconds)
-    }
-    
-    var unix_time: time_t {
-        return nanoseconds / 1_000_000_000
-    }
-}
-
-public func +(lhs: CCTimeInterval, rhs: CCTimeInterval) -> CCTimeInterval {
-    return CCTimeInterval(sec: 0, milisec: 0, microsec: 0, nsec: lhs.nanoseconds + rhs.nanoseconds)
-}
-
-public func -(lhs: CCTimeInterval, rhs: CCTimeInterval) -> CCTimeInterval {
-    return CCTimeInterval(sec: 0, milisec: 0, microsec: 0, nsec: lhs.nanoseconds - rhs.nanoseconds)
-}
-
-public func *(lhs: CCTimeInterval, rhs: CCTimeInterval) -> CCTimeInterval {
-    return CCTimeInterval(sec: 0, milisec: 0, microsec: 0, nsec: lhs.nanoseconds * rhs.nanoseconds)
-}
-
-public func /(lhs: CCTimeInterval, rhs: CCTimeInterval) -> CCTimeInterval {
-    return CCTimeInterval(sec: 0, milisec: 0, microsec: 0, nsec: lhs.nanoseconds / rhs.nanoseconds)
-}
-
-public func +=(lhs: inout CCTimeInterval, rhs: CCTimeInterval) {
-    lhs.nanoseconds += rhs.nanoseconds
-}
-
-public func -=(lhs: inout CCTimeInterval, rhs: CCTimeInterval) {
-    lhs.nanoseconds -= rhs.nanoseconds
-}
-
-public func *=(lhs: inout CCTimeInterval, rhs: CCTimeInterval) {
-    lhs.nanoseconds *= rhs.nanoseconds
-}
-
-public func /=(lhs: inout CCTimeInterval, rhs: CCTimeInterval) {
-    lhs.nanoseconds /= rhs.nanoseconds
-}
-
-public func %(lhs: CCTimeInterval, rhs: CCTimeInterval) -> CCTimeInterval {
-    return CCTimeInterval(sec: 0, milisec: 0, microsec: 0, nsec: lhs.nanoseconds % rhs.nanoseconds)
-}
-
-public func ==(lhs: CCTimeInterval, rhs: CCTimeInterval) -> Bool {
-    return lhs.nanoseconds == rhs.nanoseconds
-}
-
-public func >(lhs: CCTimeInterval, rhs: CCTimeInterval) -> Bool {
-    return lhs.nanoseconds > rhs.nanoseconds
-}
-
-public func <(lhs: CCTimeInterval, rhs: CCTimeInterval) -> Bool {
-    return lhs.nanoseconds < rhs.nanoseconds
-}
-
-public func >=(lhs: CCTimeInterval, rhs: CCTimeInterval) -> Bool {
-    return lhs.nanoseconds >= rhs.nanoseconds
-}
-
-public func <=(lhs: CCTimeInterval, rhs: CCTimeInterval) -> Bool {
-    return lhs.nanoseconds <= rhs.nanoseconds
 }
 
 public final class Timer {
     public var interval: CCTimeInterval
     public var events = [UUID : () -> Void]()
-    internal var eventsIntervals = [UUID : (start: Int, interval: Int)]()
     
+    private var annoymousActions = [Int : () -> Void]()
+    
+    private var scheduled = [() -> Void]()
+    
+    internal var eventsIntervals = [UUID : (start: Int, interval: Int)]()
     internal var source: DispatchSourceTimer
+    internal var started = timespec()
+    
     public var delegate: TimerDelegate?
     private var suspended = true
     private var ticks = 0
@@ -120,9 +56,19 @@ public final class Timer {
         let uuid = UUID()
         self.events[uuid] = action
         let now = self.ticks
-        let ev_ticks = Int(round(Double(self.interval.nanoseconds) / Double(timeinterval.nanoseconds)))
+        let ev_ticks = Int(round(Double(timeinterval.nanoseconds)/Double(self.interval.nanoseconds)))
         self.eventsIntervals[uuid] = (now, ev_ticks)
         return uuid
+    }
+    
+    public func scheduledOneshot(timeinterval: CCTimeInterval, action: @escaping () -> Void) {
+        queue {
+            let ev_ticks = Int(round(Double(timeinterval.nanoseconds)/Double(self.interval.nanoseconds)))
+            self.annoymousActions[self.ticks + ev_ticks] = {
+                action()
+                self.annoymousActions.removeValue(forKey: self.ticks + ev_ticks)
+            }
+        }
     }
     
     public func remove(uuid: UUID) {
@@ -130,11 +76,39 @@ public final class Timer {
         self.events.removeValue(forKey: uuid)
     }
     
+    public static func now() -> timespec {
+        var time = timespec()
+        #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+            if #available(OSX 10.12, iOS 10, *) {
+                clock_gettime(_CLOCK_REALTIME, &time)
+            } else {
+                var clock = clock_serv_t()
+                host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &clock)
+                var mach_ts = mach_timespec()
+                clock_get_time(clock, &mach_ts)
+                time = timespec(tv_sec: Int(mach_ts.tv_sec), tv_nsec: Int(mach_ts.tv_nsec))
+                mach_port_deallocate(mach_task_self_, clock)
+            }
+        #elseif os(FreeBSD)
+            clock_gettime(CLOCK_REALTIME_FAST, &time)
+        #elseif os(Linux)
+            clock_gettime(CLOCK_REALTIME, &time)
+        #endif
+        return time
+    }
+    
     public init(interval: CCTimeInterval) {
         self.interval = interval
         self.source = DispatchSource.makeTimerSource()
+        
+        self.started = Timer.now()
+        
         source.setEventHandler {
             self.ticks += 1
+            while !self.scheduled.isEmpty {
+                self.scheduled.removeFirst()()
+            }
+            
             for (uuid, event) in self.events {
                 guard let t = self.eventsIntervals[uuid] else {
                     continue
@@ -148,6 +122,10 @@ public final class Timer {
         }
         
         self.source.scheduleRepeating(deadline: DispatchTime.now(), interval: interval.dispatchTimeInterval)
+    }
+    
+    private func queue(action: @escaping () -> Void) {
+        scheduled.append(action)
     }
     
     deinit {

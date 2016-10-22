@@ -13,15 +13,21 @@ import Glibc
 #endif
 
 public enum CacheLifeTimePolicy {
-    case forever // keep the cache in container forever unless removed
-    case strictInterval(time_t) // keep the cache for t amount of time strict after created
-    case idleInterval(time_t) // remove the cache if the cache haven't read for an interval of time
+    case forever // keep the cache in container forever unless explictly removed
+    case strictInterval(CCTimeInterval) // keep the cache for t amount of time strict after created
+    case idleInterval(CCTimeInterval) // remove the cache if the cache haven't read for an interval of time
 }
 
 // how should we time the cache lifetime??
 public enum CacheTimerPolicy {
     case global // use the container's timer. For example, if the timer of container fires every 2s, where we set the lifetime of the cache as `strictInterval` and 1.5 sec, than the cache will be remove in between 1.5 - 2.0s
-    case independent // setup an independent timer. For example, if the timer of container fires every 2s, where we set the lifetime of the cache as `strictInterval` and 1.5 sec, than the cache will be remove strictly at 1.5s
+    case independent(CCTimeInterval) // setup an independent timer. For example, if the timer of container fires every 2s, where we set the lifetime of the cache as `strictInterval` and 1.5 sec, than the cache will be remove strictly at 1.5s
+}
+
+public enum CachePolicy {
+    case once // cache only once
+    case interval(CCTimeInterval) // update every certain interval
+    case oldCopy // return cached content first then update content if changed while requested
 }
 
 public enum FileCachePolicy {

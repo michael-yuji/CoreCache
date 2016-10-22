@@ -40,10 +40,10 @@ import Darwin
 import Glibc
 #endif
 
-public struct CachedFile {
+public struct CachedFile: Cache {
     var source: DispatchSourceProtocol?
     internal var file: File
-    public var lifeTimePolicy: CacheLifeTimePolicy
+    internal var timer: Timer?
 }
 
 public extension CachedFile {
@@ -73,12 +73,11 @@ public extension CachedFile {
         }
     }
     
-    public init(path: String, policy: FileCachePolicy, lifetime: timespec, lifeTimePolicy: CacheLifeTimePolicy) throws {
+    public init(path: String, policy: FileCachePolicy) throws {
         let fd = open(path, O_RDWR)
         let laststat = try FileStatus(fd: fd)
         let updatedDate = time(nil)
-        self.lifeTimePolicy = lifeTimePolicy
-
+        
         self.file = File(path: path,
                          policy: policy,
                          fd: fd,
@@ -136,7 +135,7 @@ public extension CachedFile {
         }
         
         if case .noReserve = policy {} else {
-            let ptr = mmap(nil, laststat.size, PROT_READ | PROT_WRITE | PROT_EXEC , MAP_FILE | MAP_PRIVATE, self.file.lastfd, 0)
+            let ptr = mmap(nil, laststat.size, PROT_READ | PROT_WRITE , MAP_FILE | MAP_PRIVATE, self.file.lastfd, 0)
             if ptr?.numerialValue == -1 {
                 perror("mmap")
             } else {

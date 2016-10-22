@@ -9,29 +9,19 @@ import struct Foundation.Data
     import Glibc
 #endif
 
-public struct CachedContent {
+public struct CachedContent: Cache {
     
-    var policies: (lifetime: CacheLifeTimePolicy,  timer: CacheTimerPolicy)
+    var policy: CacheLifeTimePolicy
     var file: File
-    public init(staticContent content: Data, lifeTimePolicy: CacheLifeTimePolicy, timerPolicy: CacheTimerPolicy) {
-//        self.cached = .static(content)
+    
+    public init(staticContent content: Data, lifeTimePolicy: CacheLifeTimePolicy) {
         self.file = File(staticContent: content)
-        self.policies = (lifeTimePolicy, timerPolicy)
+        self.policy = lifeTimePolicy
     }
     
-    public init(lifeTimePolicy: CacheLifeTimePolicy, timerPolicy: CacheTimerPolicy, dynamic: @escaping () -> Data) {
-//        self.cached = .dynamic(dynamic)
+    public init(lifeTimePolicy: CacheLifeTimePolicy, dynamic: @escaping () -> Data) {
         self.file = File(dynamic: dynamic)
-        self.policies = (lifeTimePolicy, timerPolicy)
-    }
-    
-    private static func initialize(content: CachedContent) {
-//        switch content.policies.lifetime {
-//        case <#pattern#>:
-//            <#code#>
-//        default:
-//            <#code#>
-//        }
+        self.policy = lifeTimePolicy
     }
     
 }

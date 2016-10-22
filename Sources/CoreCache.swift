@@ -46,134 +46,134 @@ extension ConvenientPointer {
         return Data(bytesNoCopy: UnsafeMutableRawPointer(self.pointer), count: self.size, deallocator: .unmap)
     }
 }
-
-public final class CacheContainer {
-    
-    public static var `default`: CacheContainer = CacheContainer()
-    
-    public enum CachedType {
-        case fileDescriptor(Int32)
-        case rawData(Data)
-        
-        public var dataValue: Data? {
-            switch self {
-            case let .fileDescriptor(fd):
-                guard let file_status = try? FileStatus(fd: fd) else {
-                    return nil
-                }
-                var buffer = [UInt8](repeating: 0, count: file_status.size)
-                read(fd, &buffer, file_status.size)
-                return Data(bytes: buffer)
-            case let .rawData(data):
-                return data
-            }
-        }
-        
-        public var length: Int {
-            switch self {
-            case let .fileDescriptor(fd):
-                guard let file_status = try? FileStatus(fd: fd) else {
-                    return 0
-                }
-                return file_status.size
-                
-            case let .rawData(data):
-                return data.count
-            }
-        }
-    }
-    
-    private enum CachedTypeInternal {
-        case fileDescriptor(Int32)
-        case generator(() -> Data)
-    }
-    
-    // realPath : fileDescriptor
-    private var cacheMap = [String: CachedType]()
-    private var cachedGenerator = [String : () -> Data]()
-    
-    public func request(for file: String) -> CachedType? {
-        guard let cached = cacheMap[file] else {
-            let filefd = open(file, O_RDWR)
-            if filefd == -1 {
-                return nil
-            }
-            self.cacheMap[file] = .fileDescriptor(filefd)
-            return .fileDescriptor(filefd)
-        }
-        return cached
-    }
-    
-    public func cacheDynamic(as path: String, refreshInterval: Double, expiration: Date?, generator: @escaping () -> Data) {
-        self.cachedGenerator[path] = generator
-        self.cacheMap[path] = .rawData(generator())
-        func nextRefresh() {
-            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + refreshInterval) {
-                if let expiration = expiration {
-                    if expiration > Date() {
-                        self.cacheMap[path] = nil
-                        self.cachedGenerator[path] = nil
-                        return
-                    }
-                }
-                guard let gen = self.cachedGenerator[path] else {
-                    return
-                }
-                self.cacheMap[path] = .rawData(gen())
-                nextRefresh()
-            }
-        }
-    }
-    
-    public func cacheStatic(as path: String, content: Data, expiration: Date?) {
-        self.cacheMap[path] = .rawData(content)
-        if let expiration = expiration {
-            let deltaTimeInterval = expiration.timeIntervalSinceNow
-            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
-                self.cacheMap[path] = nil
-            })
-        }
-    }
-    
-    public func cacheFile(at path: String, expiration: Date?) {
-        let filefd = open(path, O_RDWR)
-        self.cacheMap[path] = .fileDescriptor(filefd)
-        if let expiration = expiration {
-            let deltaTimeInterval = expiration.timeIntervalSinceNow
-            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
-                self.cacheMap[path] = nil
-                close(filefd)
-            })
-        }
-    }
-    
-    public func cacheFileContent(at path: String, expiration: Date?) -> Data? {
-        let filefd = open(path, O_RDWR)
-        
-        guard let filesize = try? FileStatus(fd: filefd).size else {
-            return nil
-        }
-        
-        guard let buffer = mmap(nil, filesize, PROT_READ | PROT_WRITE, 0, filefd, 0) else {
-            return nil
-        }
-        
-        let data = Data(bytesNoCopy: buffer, count: filesize, deallocator: .unmap)
-        
-        self.cacheMap[path] = .rawData(data)
-        if let expiration = expiration {
-            let deltaTimeInterval = expiration.timeIntervalSinceNow
-            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
-                self.cacheMap[path] = nil
-            })
-        }
-        
-        return data
-    }
-    
-    public func removeCache(at path: String) {
-        self.cacheMap[path] = nil
-        self.cachedGenerator[path] = nil
-    }
-    
-}
+//
+//public final class CacheContainer {
+//    
+//    public static var `default`: CacheContainer = CacheContainer()
+//    
+//    public enum CachedType {
+//        case fileDescriptor(Int32)
+//        case rawData(Data)
+//        
+//        public var dataValue: Data? {
+//            switch self {
+//            case let .fileDescriptor(fd):
+//                guard let file_status = try? FileStatus(fd: fd) else {
+//                    return nil
+//                }
+//                var buffer = [UInt8](repeating: 0, count: file_status.size)
+//                read(fd, &buffer, file_status.size)
+//                return Data(bytes: buffer)
+//            case let .rawData(data):
+//                return data
+//            }
+//        }
+//        
+//        public var length: Int {
+//            switch self {
+//            case let .fileDescriptor(fd):
+//                guard let file_status = try? FileStatus(fd: fd) else {
+//                    return 0
+//                }
+//                return file_status.size
+//                
+//            case let .rawData(data):
+//                return data.count
+//            }
+//        }
+//    }
+//    
+//    private enum CachedTypeInternal {
+//        case fileDescriptor(Int32)
+//        case generator(() -> Data)
+//    }
+//    
+//    // realPath : fileDescriptor
+//    private var cacheMap = [String: CachedType]()
+//    private var cachedGenerator = [String : () -> Data]()
+//    
+//    public func request(for file: String) -> CachedType? {
+//        guard let cached = cacheMap[file] else {
+//            let filefd = open(file, O_RDWR)
+//            if filefd == -1 {
+//                return nil
+//            }
+//            self.cacheMap[file] = .fileDescriptor(filefd)
+//            return .fileDescriptor(filefd)
+//        }
+//        return cached
+//    }
+//    
+//    public func cacheDynamic(as path: String, refreshInterval: Double, expiration: Date?, generator: @escaping () -> Data) {
+//        self.cachedGenerator[path] = generator
+//        self.cacheMap[path] = .rawData(generator())
+//        func nextRefresh() {
+//            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + refreshInterval) {
+//                if let expiration = expiration {
+//                    if expiration > Date() {
+//                        self.cacheMap[path] = nil
+//                        self.cachedGenerator[path] = nil
+//                        return
+//                    }
+//                }
+//                guard let gen = self.cachedGenerator[path] else {
+//                    return
+//                }
+//                self.cacheMap[path] = .rawData(gen())
+//                nextRefresh()
+//            }
+//        }
+//    }
+//    
+//    public func cacheStatic(as path: String, content: Data, expiration: Date?) {
+//        self.cacheMap[path] = .rawData(content)
+//        if let expiration = expiration {
+//            let deltaTimeInterval = expiration.timeIntervalSinceNow
+//            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
+//                self.cacheMap[path] = nil
+//            })
+//        }
+//    }
+//    
+//    public func cacheFile(at path: String, expiration: Date?) {
+//        let filefd = open(path, O_RDWR)
+//        self.cacheMap[path] = .fileDescriptor(filefd)
+//        if let expiration = expiration {
+//            let deltaTimeInterval = expiration.timeIntervalSinceNow
+//            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
+//                self.cacheMap[path] = nil
+//                close(filefd)
+//            })
+//        }
+//    }
+//    
+//    public func cacheFileContent(at path: String, expiration: Date?) -> Data? {
+//        let filefd = open(path, O_RDWR)
+//        
+//        guard let filesize = try? FileStatus(fd: filefd).size else {
+//            return nil
+//        }
+//        
+//        guard let buffer = mmap(nil, filesize, PROT_READ | PROT_WRITE, 0, filefd, 0) else {
+//            return nil
+//        }
+//        
+//        let data = Data(bytesNoCopy: buffer, count: filesize, deallocator: .unmap)
+//        
+//        self.cacheMap[path] = .rawData(data)
+//        if let expiration = expiration {
+//            let deltaTimeInterval = expiration.timeIntervalSinceNow
+//            DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + deltaTimeInterval, execute: {
+//                self.cacheMap[path] = nil
+//            })
+//        }
+//        
+//        return data
+//    }
+//    
+//    public func removeCache(at path: String) {
+//        self.cacheMap[path] = nil
+//        self.cachedGenerator[path] = nil
+//    }
+//    
+//}
