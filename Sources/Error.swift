@@ -6,7 +6,7 @@
 //
 //
 
-public extension CachedFile {
+extension CachedFile {
     public enum Error : Swift.Error {
         case open(String)
     }

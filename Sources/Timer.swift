@@ -25,19 +25,58 @@ public extension timespec {
 public final class Timer {
     public var interval: CCTimeInterval
     public var events = [UUID : () -> Void]()
-    
-    private var annoymousActions = [Int : () -> Void]()
-    
-    private var scheduled = [() -> Void]()
+    public var delegate: TimerDelegate?
     
     internal var eventsIntervals = [UUID : (start: Int, interval: Int)]()
     internal var source: DispatchSourceTimer
     internal var started = timespec()
+
+    fileprivate var annoymousActions = [Int : () -> Void]()
+    fileprivate var scheduled = [() -> Void]()
+    fileprivate var suspended = true
+    fileprivate var ticks = 0
     
-    public var delegate: TimerDelegate?
-    private var suspended = true
-    private var ticks = 0
+    public init(interval: CCTimeInterval) {
+        self.interval = interval
+        self.source = DispatchSource.makeTimerSource()
+        
+        self.started = Timer.now()
+        
+        source.setEventHandler {
+            self.ticks += 1
+            while !self.scheduled.isEmpty {
+                self.scheduled.removeFirst()()
+            }
+            
+            for (uuid, event) in self.events {
+                guard let t = self.eventsIntervals[uuid] else {
+                    continue
+                }
+                
+                if (self.ticks - t.start) % t.interval == 0 {
+                    self.delegate?.didExecutableTask(timer: self, taskId: uuid)
+                    event()
+                }
+            }
+        }
+        
+        self.source.scheduleRepeating(deadline: DispatchTime.now(), interval: interval.dispatchTimeInterval)
+    }
     
+    deinit {
+        if !suspended {
+            self.stop()
+        }
+        self.source.cancel()
+    }
+    
+}
+
+public protocol TimerDelegate {
+    func didExecutableTask(timer: Timer, taskId: UUID)
+}
+
+public extension Timer {
     public func fire() {
         if suspended {
             self.source.resume()
@@ -97,46 +136,7 @@ public final class Timer {
         return time
     }
     
-    public init(interval: CCTimeInterval) {
-        self.interval = interval
-        self.source = DispatchSource.makeTimerSource()
-        
-        self.started = Timer.now()
-        
-        source.setEventHandler {
-            self.ticks += 1
-            while !self.scheduled.isEmpty {
-                self.scheduled.removeFirst()()
-            }
-            
-            for (uuid, event) in self.events {
-                guard let t = self.eventsIntervals[uuid] else {
-                    continue
-                }
-                
-                if (self.ticks - t.start) % t.interval == 0 {
-                    self.delegate?.didExecutableTask(timer: self, taskId: uuid)
-                    event()
-                }
-            }
-        }
-        
-        self.source.scheduleRepeating(deadline: DispatchTime.now(), interval: interval.dispatchTimeInterval)
-    }
-    
-    private func queue(action: @escaping () -> Void) {
+    fileprivate func queue(action: @escaping () -> Void) {
         scheduled.append(action)
     }
-    
-    deinit {
-        if !suspended {
-            self.stop()
-        }
-        self.source.cancel()
-    }
-    
-}
-
-public protocol TimerDelegate {
-    func didExecutableTask(timer: Timer, taskId: UUID)
 }

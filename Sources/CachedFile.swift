@@ -40,13 +40,13 @@ import Darwin
 import Glibc
 #endif
 
-public struct CachedFile: Cache {
+internal struct CachedFile: Cache {
     var source: DispatchSourceProtocol?
     internal var file: File
     internal var timer: Timer?
 }
 
-public extension CachedFile {
+internal extension CachedFile {
     internal var path: String {
         return self.file.path
     }
@@ -57,9 +57,9 @@ public extension CachedFile {
     
 }
 
-public extension CachedFile {
+internal extension CachedFile {
     
-    public func read() -> Data? {
+    internal func read() -> Data? {
         switch self.file.policy {
         case .oldCopy:
             let reserved = self.file.mappedData
@@ -73,7 +73,7 @@ public extension CachedFile {
         }
     }
     
-    public init(path: String, policy: FileCachePolicy) throws {
+    internal init(path: String, policy: FileCachePolicy) throws {
         let fd = open(path, O_RDWR)
         let laststat = try FileStatus(fd: fd)
         let updatedDate = time(nil)

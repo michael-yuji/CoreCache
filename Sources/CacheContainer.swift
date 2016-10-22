@@ -58,6 +58,26 @@ public final class CacheContainer {
         
         append(ident: identifier, cache: cache, lifetime: lifetime, buuid: uuid)
     }
+    public func cache(identifier: String, dynamic data: @escaping () -> Data, policy: CachePolicy, lifetime: CacheLifeTimePolicy) {
+        let cache = CachedContent(lifeTimePolicy: lifetime, dynamic: data)
+        var uuid: UUID?
+        switch policy {
+        case .once:
+            break
+        case let .interval(dt):
+            uuid = self.clock.append(timeinterval: dt, action: {
+                guard let c = self.cached[identifier],
+                    var content = c as? CachedContent else {
+                        return
+                }
+                content.update()
+            })
+        default:
+            break
+        }
+        
+        append(ident: identifier, cache: cache, lifetime: lifetime, buuid: uuid)
+    }
     
     internal func append(ident: String, cache: Cache, lifetime: CacheLifeTimePolicy, buuid: UUID? = nil) {
         self.cached[ident] = cache

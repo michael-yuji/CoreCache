@@ -15,7 +15,7 @@ import struct Foundation.Data
     import Glibc
 #endif
 
-public extension CachedFile {
+internal extension CachedFile {
     
     internal class File {
         
@@ -30,7 +30,7 @@ public extension CachedFile {
         internal var mappedData: Data?
         internal var swap: Data?
         
-        public init(path: String, policy: FileCachePolicy, fd: Int32, stat: FileStatus, updated: time_t) {
+        internal init(path: String, policy: FileCachePolicy, fd: Int32, stat: FileStatus, updated: time_t) {
             self.path = path
             self.policy = policy
             self.lastfd = fd
