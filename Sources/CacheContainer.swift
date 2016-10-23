@@ -33,10 +33,6 @@
 import Foundation
 import CKit
 
-#if os(Linux)
-import inotify
-#endif
-
 public final class CacheContainer {
     public static var shared: CacheContainer = CacheContainer(refreshResulotion: CCTimeInterval(milisec: 100))
     public var cached = [String: Cache]()
