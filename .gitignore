@@ -5,6 +5,8 @@
 ## Build generated
 build/
 DerivedData/
+Packages/
+
 .DS_Store
 
 ## Various settings
