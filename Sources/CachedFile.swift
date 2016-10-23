@@ -41,12 +41,12 @@ import Glibc
 #endif
 
 internal struct CachedFile: Cache {
-    var source: DispatchSourceProtocol?
+    internal var source: DispatchSourceProtocol?
     internal var file: File
     internal var timer: Timer?
 }
 
-internal extension CachedFile {
+extension CachedFile {
     internal var path: String {
         return self.file.path
     }
@@ -73,7 +73,11 @@ internal extension CachedFile {
         }
     }
     
-    internal init(path: String, policy: FileCachePolicy) throws {
+    internal func update() {
+        try? self.file.update()
+    }
+    
+    internal init(path: String, policy: CachePolicy) throws {
         let fd = open(path, O_RDWR)
         let laststat = try FileStatus(fd: fd)
         let updatedDate = time(nil)
@@ -88,27 +92,6 @@ internal extension CachedFile {
         var source: DispatchSourceProtocol?
         
         switch policy {
-            
-        case let .interval(time):
-            
-            source = DispatchSource.makeTimerSource()
-            (source as! DispatchSourceTimer).scheduleRepeating(wallDeadline: DispatchWallTime.now(), interval: DispatchTimeInterval.seconds(time))
-            
-            source!.setEventHandler {
-                _ = source
-                
-                guard let file = file else {
-                    
-                    return
-                }
-                
-                do {
-                    try file.update()
-                } catch {}
-            }
-            
-            source!.resume()
-            
         case .up2Date:
             
             func register(fd: Int32) {

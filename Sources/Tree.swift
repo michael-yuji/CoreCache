@@ -1,14 +1,10 @@
 
-//
-// Easier way to play with Dictionary of Dictionary of Dictionary of ......
-//
-
 public enum Branch<T> {
-    case tree(NamedTree<T>)
+    case tree(SigularTree<T>)
     case leaf(T)
     
     @discardableResult
-    public func treeValue() -> NamedTree<T>? {
+    public func treeValue() -> SigularTree<T>? {
         if case let .tree(t) = self {
             return t
         }
@@ -24,7 +20,7 @@ public enum Branch<T> {
     }
 }
 
-public final class NamedTree<T> {
+public final class SigularTree<T> {
     
     public init() {}
     
@@ -32,7 +28,7 @@ public final class NamedTree<T> {
     
     //    public subscript(queries: String...) -> T? {
     //        get {
-    //            var current: NamedTree<T> = self
+    //            var current: SigularTree<T> = self
     //            var queries = queries
     //            let lastquery = queries.removeLast()
     //            for query in queries {
@@ -58,7 +54,7 @@ public final class NamedTree<T> {
     public subscript(queries: String...) -> Branch<T>? {
         
         get {
-            var current: NamedTree<T> = self
+            var current: SigularTree<T> = self
             var queries = queries
             let lastquery = queries.removeLast()
             for query in queries {
@@ -96,11 +92,11 @@ public final class NamedTree<T> {
     public func addLeaf(at queries: String..., as x: T?) -> Void? {
         var queries = queries
         let lastq = queries.removeLast()
-        var current: NamedTree<T> = self
+        var current: SigularTree<T> = self
         for query in queries {
             var result = branches[query]
             if result == nil  {
-                branches[query] = .tree(NamedTree<T>())
+                branches[query] = .tree(SigularTree<T>())
                 result = branches[query]
             }
             switch result! {
@@ -121,14 +117,14 @@ public final class NamedTree<T> {
     }
     
     @discardableResult
-    public func addBranch(at queries: String..., as1 tx: NamedTree<T>? = NamedTree<T>()) -> Void? {
+    public func addBranch(at queries: String..., as1 tx: SigularTree<T>? = SigularTree<T>()) -> Void? {
         var queries = queries
         let lastq = queries.removeLast()
-        var current: NamedTree<T> = self
+        var current: SigularTree<T> = self
         for query in queries {
             var result = branches[query]
             if result == nil  {
-                branches[query] = .tree(NamedTree<T>())
+                branches[query] = .tree(SigularTree<T>())
                 result = branches[query]
             }
             switch result! {
@@ -152,11 +148,11 @@ public final class NamedTree<T> {
     public func addLeaf(at queries: [String], as x: T?) -> Void? {
         var queries = queries
         let lastq = queries.removeLast()
-        var current: NamedTree<T> = self
+        var current: SigularTree<T> = self
         for query in queries {
             var result = branches[query]
             if result == nil  {
-                branches[query] = .tree(NamedTree<T>())
+                branches[query] = .tree(SigularTree<T>())
                 result = branches[query]
             }
             switch result! {
@@ -180,11 +176,11 @@ public final class NamedTree<T> {
     public func addBranch(at queries: [String]) -> Void? {
         var queries = queries
         let lastq = queries.removeLast()
-        var current: NamedTree<T> = self
+        var current: SigularTree<T> = self
         for query in queries {
             var result = branches[query]
             if result == nil  {
-                branches[query] = .tree(NamedTree<T>())
+                branches[query] = .tree(SigularTree<T>())
                 result = branches[query]
             }
             switch result! {
@@ -194,12 +190,12 @@ public final class NamedTree<T> {
                 return nil
             }
         }
-        current.branches[lastq] = .tree(NamedTree<T>())
+        current.branches[lastq] = .tree(SigularTree<T>())
         return Void()
     }
     
     public static func make<T>(branches: () -> [String: Branch<T>]) -> Branch<T> {
-        let root = NamedTree<T>()
+        let root = SigularTree<T>()
         root.branches = branches()
         return .tree(root)
     }

@@ -46,3 +46,8 @@ extension ConvenientPointer {
         return Data(bytesNoCopy: UnsafeMutableRawPointer(self.pointer), count: self.size, deallocator: .unmap)
     }
 }
+
+public protocol Cache {
+    func read() -> Data?
+    mutating func update()
+}
