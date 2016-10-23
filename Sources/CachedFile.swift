@@ -93,7 +93,7 @@ internal extension CachedFile {
         
         switch policy {
         case .up2Date:
-            
+            #if !os(Linux)
             func register(fd: Int32) {
                 source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .link)
                 source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
@@ -112,7 +112,8 @@ internal extension CachedFile {
             }
             
             register(fd: fd)
-            
+            #endif
+            break
         default:
             break
         }

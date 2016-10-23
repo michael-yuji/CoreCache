@@ -33,10 +33,16 @@
 import Foundation
 import CKit
 
+#if os(Linux)
+import inotify
+#endif
+
 public final class CacheContainer {
     public static var shared: CacheContainer = CacheContainer(refreshResulotion: CCTimeInterval(milisec: 100))
     public var cached = [String: Cache]()
     public var clock: Timer
+    internal var inotify_fd: Int32 = 0
+    
     fileprivate var scheduledRemovalTable = [String: (CCTimeInterval, CCTimeInterval)]()
     public init(refreshResulotion: CCTimeInterval) {
         self.clock = Timer(interval: refreshResulotion)
