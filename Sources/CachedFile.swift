@@ -122,12 +122,19 @@ internal extension CachedFile {
             let reserved = self.file.mappedData
             try? self.file.update()
             return reserved
+        case .up2Date:
+            #if os(Linux)
+            fallthrough
+            #else
+            break
+            #endif
         case .lazyUp2Date:
             try? self.file.update()
             fallthrough
         default:
-            return self.file.mappedData
+            break
         }
+        return self.file.mappedData
     }
     
     internal func update() {
