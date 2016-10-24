@@ -39,7 +39,7 @@ let data = CacheContainer.shared[my_ident]
 public enum CachePolicy {
     case once // cache only once and not update
     case interval(CCTimeInterval) // update every certain interval
-    case up2Date // File only option, track changes of the underlying file
+    case up2Date // File only option, track changes of and update the underlying file, Support only OSX and FreeBSD
     case lazyUp2Date // File only option, track changes and update when the cache is requested.
     case noReserve // File only option, cache only file descriptor ** not implemented yet
     case oldCopy // File only option, same as lazyUp2Date, but return the old copy instead of up-to-date one
