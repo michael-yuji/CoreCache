@@ -44,7 +44,9 @@ internal struct CachedFile: Cache {
     internal var source: DispatchSourceProtocol?
     internal var file: File
     internal var timer: Timer?
-    
+}
+
+extension CachedFile {
     internal final class File {
         
         internal var path: String
