@@ -41,13 +41,14 @@ import Glibc
 #endif
 
 internal struct CachedFile: Cache {
-    internal var source: DispatchSourceProtocol?
     internal var file: File
     internal var timer: Timer?
 }
 
 extension CachedFile {
     internal final class File {
+        
+        internal var source: DispatchSourceProtocol?
         
         internal var path: String
         internal var policy: CachePolicy
@@ -153,15 +154,14 @@ internal extension CachedFile {
                          updated: updatedDate)
         
         var file: File? = self.file
-        var source: DispatchSourceProtocol?
         
         switch policy {
         case .up2Date:
             #if !os(Linux)
             func register(fd: Int32) {
-                source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .link)
-                source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
-                    _ = source
+                let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .link)
+                source.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
+//                    _ = source
                     
                     guard let file = file else {
                         return
@@ -172,7 +172,7 @@ internal extension CachedFile {
                         register(fd: file.lastfd)
                     } catch {}
                 })
-                source!.resume()
+                self.file.source = source
             }
             
             register(fd: fd)
@@ -181,6 +181,8 @@ internal extension CachedFile {
         default:
             break
         }
+        
+        self.file.source?.resume()
         
         if case .noReserve = policy {} else {
             let ptr = mmap(nil, laststat.size, PROT_READ | PROT_WRITE , MAP_FILE | MAP_PRIVATE, self.file.lastfd, 0)
