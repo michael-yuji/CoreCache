@@ -14,8 +14,14 @@ let my_ident = "some_id" /* identifier(key) to cache */
 CacheContainer.shared.cacheFile(at: "/path/to/file", as: my_ident, using: .up2Date, lifetime: .forever, errhandler: nil)
 
 // when you want to read from cache:
-
 let file_data = CacheContainer.shared[my_ident]
+
+#if !os(Linux)
+// sometimes it is easiler to get the file descriptor instead (FreeBSD/OSX only feature)
+// notice that the file descriptor could change depends when the underlying file
+// changes. This function will return nil if file descriptor is unavailable
+let fd = CacheContainer.shared.currentFd(of: my_ident) 
+#endif
 ```
 
 Sometime, we generate some data periodically in code. We can cache these kind of content and let the CacheContainer update it for you automatically.
@@ -41,7 +47,7 @@ public enum CachePolicy {
     case interval(CCTimeInterval) // update every certain interval
     case up2Date // File only option, track changes of and update the underlying file, Support only OSX and FreeBSD
     case lazyUp2Date // File only option, track changes and update when the cache is requested.
-    case noReserve // File only option, cache only file descriptor ** not implemented yet
+    case noReserve // File only option, cache only file descriptor
     case oldCopy // File only option, same as lazyUp2Date, but return the old copy instead of up-to-date one
 }
 ```

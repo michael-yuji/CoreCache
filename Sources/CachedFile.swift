@@ -69,6 +69,25 @@ extension CachedFile {
             self.updatedDate = updated
         }
         
+        #if !os(Linux)
+        internal func setSource(to fd: Int32) {
+            self.source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.link, .write])
+            self.source!.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
+                do {
+                    try self.update()
+                } catch {}
+            })
+            self.source!.resume()
+        }
+        
+        internal func resetSource(to fd: Int32) {
+            if self.source != nil {
+                self.source!.cancel()
+                self.setSource(to: fd)
+            }
+        }
+        #endif
+        
         internal func update() throws {
             if let stat = try? FileStatus(fd: self.lastfd) {
                 if stat == self.laststat {
@@ -86,6 +105,10 @@ extension CachedFile {
             
             self.lastfd = newfd
             self.laststat = try FileStatus(fd: lastfd)
+            
+            #if !os(Linux)
+            resetSource(to: newfd)
+            #endif
             
             if case .noReserve = policy {} else {
                 
@@ -112,7 +135,6 @@ extension CachedFile {
     internal var updatedDate: time_t {
         return self.file.updatedDate
     }
-    
 }
 
 internal extension CachedFile {
@@ -138,6 +160,10 @@ internal extension CachedFile {
         return self.file.mappedData
     }
     
+    internal var currentFileDescriptor: Int32 {
+        return self.file.lastfd
+    }
+    
     internal func update() {
         try? self.file.update()
     }
@@ -153,36 +179,15 @@ internal extension CachedFile {
                          stat: laststat,
                          updated: updatedDate)
         
-        var file: File? = self.file
-        
         switch policy {
         case .up2Date:
             #if !os(Linux)
-            func register(fd: Int32) {
-                let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .link)
-                source.setEventHandler(qos: DispatchQoS.default, flags: [], handler: {
-//                    _ = source
-                    
-                    guard let file = file else {
-                        return
-                    }
-                    
-                    do {
-                        try file.update()
-                        register(fd: file.lastfd)
-                    } catch {}
-                })
-                self.file.source = source
-            }
-            
-            register(fd: fd)
+            self.file.setSource(to: fd)
             #endif
             break
         default:
             break
         }
-        
-        self.file.source?.resume()
         
         if case .noReserve = policy {} else {
             let ptr = mmap(nil, laststat.size, PROT_READ | PROT_WRITE , MAP_FILE | MAP_PRIVATE, self.file.lastfd, 0)

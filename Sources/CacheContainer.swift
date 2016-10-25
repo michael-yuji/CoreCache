@@ -48,6 +48,18 @@ public final class CacheContainer {
 
 // -MARK: Exposed API
 extension CacheContainer {
+    
+    public func currentFd(of ident: String) -> Int32? {
+        guard
+            let cache = self.cached[ident],
+            let file = cache as? CachedFile else {
+                return nil
+        }
+        
+        return file.currentFileDescriptor
+    }
+    
+    
     public subscript(str: String) -> Data? {
         
         if let (dt, scheduledRemoval) = self.scheduledRemovalTable[str] {
