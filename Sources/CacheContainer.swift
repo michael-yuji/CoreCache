@@ -37,6 +37,8 @@ public final class CacheContainer {
     public static var shared: CacheContainer = CacheContainer(refreshResulotion: CCTimeInterval(milisec: 100))
     public var cached = [String: Cache]()
     public var clock: Timer
+    
+    
     internal var inotify_fd: Int32 = 0
     
     fileprivate var scheduledRemovalTable = [String: (CCTimeInterval, CCTimeInterval)]()
@@ -69,6 +71,10 @@ extension CacheContainer {
         }
         
         return self.cached[str]?.read()
+    }
+    
+    public func remove(item key: String) {
+        remove(cache: key, uuid: nil)
     }
     
     public func cacheFile(at path: String, as identifier: String, using policy: CachePolicy, lifetime: CacheLifeTimePolicy, errHandle: ((_ path:String, _ error: Error) -> ())?) {
@@ -111,9 +117,12 @@ extension CacheContainer {
         case .once:
             break
         case let .interval(dt):
-            uuid = self.clock.schedulePeriodic(timeinterval: dt, action: {
+            uuid = self.clock.schedulePeriodic(timeinterval: dt, action: { clock, uuid in
                 guard var content = self.cached[ident] else {
-                        return
+                    if let clock = clock {
+                        clock.remove(uuid: uuid)
+                    }
+                    return
                 }
                 content.update()
             })

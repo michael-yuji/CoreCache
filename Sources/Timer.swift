@@ -87,9 +87,11 @@ public final class Timer {
         return Int(round(Double(nanoseconds - started.hashValue) / Double(self.interval.nanoseconds)))
     }
     
-    public func schedulePeriodic(timeinterval: CCTimeInterval, action: @escaping () -> Void) -> UUID {
+    public func schedulePeriodic(timeinterval: CCTimeInterval, action: @escaping (Timer?, UUID) -> Void) -> UUID {
         let uuid = UUID()
-        self.periodics[uuid] = action
+        self.periodics[uuid] = { [weak self] in
+            action(self, uuid)
+        }
         let now = self.ticks
         let ev_ticks = Int(round(Double(timeinterval.nanoseconds)/Double(self.interval.nanoseconds)))
         self.eventsIntervals[uuid] = (now, ev_ticks)
